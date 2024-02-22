@@ -142,47 +142,7 @@ chi.table<- function(Xfactor, Yfactor){
   return(chitable)
 }
 
-#Plots the result of the chi.table function
-chi.plot <- function(chitable,Xfactors, style = "proportion"){
-  Xfactors <- as.factor(Xfactors)
-  total <- length(Xfactors) 
-  #Xfactors <- Xfactors[-which(Xfactors %in% levels(Xfactors)[nlevels(Xfactors)])]
-  chitable$Yfactor <- factor(chitable$factor, levels = c(as.character(chitable$factor)))
-  data <- NULL
-  Xfactor <- NULL
-  yintercept <- NULL
-  a <- 0
-  #n <- (ncol(chitable)-4)/2
-  n <- nlevels(Xfactors)
-  for(i in 1:n){
-    data <- c(data,chitable[,i+1])
-    Xfactor <- c(Xfactor,rep(colnames(chitable)[i+1],nlevels(chitable$Yfactor)))
-    a <- a+table(Xfactors)[i]
-    yintercept <- c(yintercept,a/total)
-  }
-    yintercept <- 1-yintercept
-    Yfactor <- rep(chitable$Yfactor,n)
-    chitable_data <- cbind.data.frame(Yfactor,data)
-    chitable_data$Xfactor <- Xfactor
-    significant <- NULL
-    for(i in 1:nrow(chitable)){
-      significant <- c(significant,if(chitable$pvalue[i] > 0.05) {"no"} else {"yes"})
-    }
-    chitable_data$significant <- significant
-    
-    chiplot<-ggplot(chitable_data, aes(x = Yfactor, y = data, fill=Xfactor)) +
-      geom_col(position="fill",) +
-      labs(x = NULL, y = NULL)  +
-      theme(legend.position = "bottom") +
-      scale_fill_manual(name = paste(Xfactors),values=c("#1e818b","#e2c537","#F6EB13","#7A752F","#734C20","#111111","#9B989B","#BE85BA","#3BB449","#ED2224","#AF3456"))+
-      coord_flip()+
-      gghighlight(chitable_data$significant %in% "yes",
-                  unhighlighted_params =  list(fill = NULL, alpha = 0.5))+
-      geom_hline(yintercept = yintercept, linewidth=0.5)
-  
-  return(chiplot)
-}
-
+#Plots the output of a chi.table function
 EU.plot <- function(Actors){
   Actors$Freq <- Actors$Yes/length(cases$Case[which(cases$France %in% "Yes")]) 
   Actors$FreqEU <- Actors$No/length(cases$Case[which(cases$France %in% "No")]) 
@@ -196,10 +156,6 @@ EU.plot <- function(Actors){
     geom_bar(position="dodge", stat = "identity")+
     coord_flip()
   return(Actors_plot)
-}
-
-save.plot <- function(chiplot){
-  ggsave(chiplot, filename = paste0(deparse(substitute(chiplot)),".svg"), width = 7, height = (1+nlevels(chiplot$data$Yfactor)/5), dpi = 300, units = "in")
 }
 
 #### LIBRARIES ####
@@ -252,46 +208,7 @@ envimpacts$France <- cases$France
 hltimpacts$France <- cases$France
 secimpacts$France <- cases$France
 
-#### 3. Categorise depending on the participation of local actors ####
-
-cases$LocalActors <- rep("No",length.out= nrow(cases))
-for(i in 1:nrow(cases)){
-  #if(mobilizinggroups$Local.ejos[i] == 1){cases$LocalActors[i] <- "Yes"} 
-  #if(mobilizinggroups$Local.government.political.parties[i] == 1){cases$LocalActors[i] <- "Yes"} 
-  if(mobilizinggroups$Neighbours.citizens.communities[i] == 1){cases$LocalActors[i] <- "Yes"} 
-}
-table(cases$LocalActors)
-
-mobilizinggroups$LocalActors <- cases$LocalActors
-mobilizingforms$LocalActors <- cases$LocalActors
-envimpacts$LocalActors <- cases$LocalActors
-hltimpacts$LocalActors <- cases$LocalActors
-secimpacts$LocalActors <- cases$LocalActors
-
-mobilizinggroups$LocalActors <- as.factor(mobilizinggroups$LocalActors)
-Actors<-chi.table(mobilizinggroups$LocalActors,mobilizinggroups)
-Actors_plot <- chi.plot(Actors,mobilizinggroups$LocalActors)
-
-France <- cases[cases$France %in% "Yes",]
-table(France$LocalActors)
-
-France <- cbind.data.frame(France,mobilizingforms[which(mobilizingforms$id %in% France$Conflict.Id),])
-France <- cbind.data.frame(France,mobilizinggroups[which(mobilizinggroups$id %in% France$Conflict.Id),])
-
-France$First.level.category <- as.factor(France$First.level.category)
-France$Project.Status <- as.factor(France$Project.Status)
-glm <- glm(Project.Status ~ Local.government.political.parties + Local.ejos + Neighbours.citizens.communities, France,  family = binomial(link = "logit"))
-
-summary(glm)
-
-Status <- chi.table(France$Local.government.political.parties,France$Project.Status)
-ChiTab <- chi.table(secimpacts$Local.government.political.parties,
-                    secimpacts)
-
-secimpacts$Local.government.political.parties <- France$Local.government.political.parties
-
-#
-#### 4. Descriptive France vs EU ####
+#### 3. Descriptive France vs EU ####
 
 mobilizinggroups$France <- as.factor(mobilizinggroups$France)
 mobilizingforms$France <- as.factor(mobilizingforms$France)
@@ -342,44 +259,7 @@ Outcomes_EU_plot <- EU.plot(Outcomes_EU)
 EJ_EU <- chi.table(cases$France,cases$EJ.served.or.not)
 EJ_EU_plot <- EU.plot(EJ_EU)
 
-#### 5. Comparison local leadership ####
-Actors_plot
-
-cases <- cbind.data.frame(cases,mobilizinggroups,mobilizingforms)
-
-for(i in 1:nrow(cases)){
-  cases$success[i] <- if(cases$EJ.served.or.not[i] %in% "Success"){"Yes"}else{"No"}
-}
-table(cases$success)
-cases$success <- as.factor(cases$success)
-
-cases$Local.ejos <- as.factor(cases$Local.ejos)
-cases$Local.government.political.parties <- as.factor(cases$Local.government.political.parties) 
-EJ_EJOS <- chi.table(cases$Local.ejos,cases$EJ.served.or.not)
-
-#cases <- cases[which(cases$France %in% "Yes"),]
-Outcome_EJOS <- chi.table(cases$Local.ejos,cases$Outcomes) 
-Outcome_parties <-chi.table(cases$Local.government.political.parties,cases$Outcomes)
-Outcome_citi <- chi.table(cases$Neighbours.citizens.communities,cases$Outcomes)
-
-Actors_EJOS <- chi.table(cases$Local.ejos,mobilizinggroups) 
-Actors_parties <-chi.table(cases$Local.government.political.parties,mobilizinggroups)
-Actors_citi <- chi.table(cases$Neighbours.citizens.communities,mobilizinggroups)
-Actors_EJOS_plot <- chi.plot(Actors_EJOS,cases$Local.ejos)
-Actors_parties_plot <- chi.plot(Actors_parties,cases$Local.government.political.parties)
-
-Status_EJOS <- chi.table(cases$Local.ejos,cases$Project.Status) 
-Status_parties <-chi.table(cases$Local.government.political.parties,cases$Project.Status)
-Status_citi <- chi.table(cases$Neighbours.citizens.communities,cases$Project.Status)
-Status_EJOS_plot <- chi.plot(Status_EJOS,cases$Local.ejos)
-Status_parties_plot <- chi.plot(Status_parties,cases$Local.government.political.parties)
-
-#### 32. Test whether project status and outcome has correlation with category ####
-
-Status_Category<-chi.table(France$Project.Status,France$First.level.category)
-Status_Category<-chi.table(France$First.level.category,France$Outcomes)
-
-#### 14. Assign category to each company ####
+#### 4. Assign category to each company ####
 
 #The most frequent conflict category is assigned as the company category
 Summary$Category <- as.numeric(rep(NA,nrow(Summary)))
@@ -389,7 +269,7 @@ for(i in 1:nrow(Summary)){
     ,decreasing = T))[1]
 }
 
-#### 15. Assign level reported to each company ####
+#### 5. Assign level reported to each company ####
 
 Summary$Reported <- as.numeric(rep(NA,nrow(Summary)))
 for(i in 1:nrow(Summary)){
@@ -411,7 +291,7 @@ levels(Summary$Reported)
 Summary$Reported <- factor(Summary$Reported, levels = c("One case", "2-4 cases", "5-7 cases", "8-30 cases","More than 30 cases"))
 sort(table(Summary$Reported), decreasing =T)
 
-#### 16. Assign country and region of origin to each company ####
+#### 6. Assign country and region of origin to each company ####
 
 #Counts the number of conflicts for each original company entry
 conflict_companys$Num_Cases <- as.numeric(rep(NA,nrow(conflict_companys)))
@@ -433,7 +313,7 @@ for(i in 1:nrow(Summary)){
 rm(a,b,Countries,Num_Cases)
 Summary$Country<-gsub("NA","ND",Summary$Country)
 
-#### 17. Identify multinational companies ####
+#### 7. Identify multinational companies ####
 
 #If a company does not have a country of origin assigned "ND", it cannot be established whether it is a multinational
 Summary$Multinational <- as.numeric(rep(NA,nrow(Summary)))
@@ -444,7 +324,7 @@ for(i in 1:nrow(Summary)){
   }
 }
 
-#### 6. Company ranking ####
+#### 8. Company ranking for France conflicts####
 
 for(i in 1:nrow(Summary)){
   a <- unlist(strsplit(Summary$conflictIDs[i], " "))
